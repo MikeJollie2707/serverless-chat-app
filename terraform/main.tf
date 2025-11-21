@@ -35,9 +35,9 @@ resource "aws_dynamodb_table" "connections" {
 
 // DynamoDB for storing messages
 resource "aws_dynamodb_table" "messages" {
-  name = "serverless-chat-messages"
+  name         = "serverless-chat-messages"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key = "messageID"
+  hash_key     = "messageID"
 
   attribute {
     name = "messageID"
@@ -353,8 +353,8 @@ resource "aws_lambda_function" "on_message" {
   environment {
     variables = {
       "connectionTableName" = aws_dynamodb_table.connections.name
-      "messageTableName" = aws_dynamodb_table.messages.name
-      "messageTopicARN" = aws_sns_topic.broadcasts.arn
+      "messageTableName"    = aws_dynamodb_table.messages.name
+      "messageTopicARN"     = aws_sns_topic.broadcasts.arn
     }
   }
 }
@@ -369,7 +369,7 @@ resource "aws_lambda_function" "broadcast_message" {
   environment {
     variables = {
       "connectionTableName" = aws_dynamodb_table.connections.name
-      "apigwEndpoint" = aws_apigatewayv2_stage.dev.invoke_url
+      "apigwEndpoint"       = aws_apigatewayv2_stage.dev.invoke_url
     }
   }
 }
