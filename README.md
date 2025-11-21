@@ -1,16 +1,18 @@
 # Serverless Chat App
 
-TBA
+A simple, lightweight chat platform using multiple AWS technologies. The goal of this project is to provide a basic understanding of how a real-chat system would work aimed to enthusiastics learners. Our project allows users to explore fundamentals all while providing the core functionalities of real-time messaging and scalability.
 
-## Quick testing
+## Core Architecture
 
-To quickly test the system (while there's still no frontend), use `wscat`. If you have `npm`, install via `npm i -g wscat`, then do `wscat -c <websocket API URL>`.
+![](assets/cs218-Project%20Architecture.jpg)
 
-Each valid message will be of the form `{"action": "valid action", ...}`
+## Future works
 
-## TODO
-
-- [ ] Cross-region
-- [ ] Authentication
-- [ ] Minimal frontend
+- [x] Minimal frontend
+- [x] Authentication
 - [ ] (optional) Channels
+- [ ] (optional) Regional broadcast
+
+## See also
+
+Frontend: https://github.com/MikeJollie2707/serverless-chat-app-frontend
