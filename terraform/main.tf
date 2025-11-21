@@ -17,29 +17,6 @@ provider "aws" {
 
 provider "archive" {}
 
-// IAM role for all Lambda functions
-resource "aws_iam_role" "lambda_exec" {
-  name = "serverless_chat_lambda_exec"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic_exec" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
 // DynamoDB table (single-region; can be converted to a global table if you add a second region)
 resource "aws_dynamodb_table" "connections" {
   name         = "serverless-chat-connections"
@@ -53,6 +30,18 @@ resource "aws_dynamodb_table" "connections" {
 
   tags = {
     Service = "serverless-chat"
+  }
+}
+
+// DynamoDB for storing messages
+resource "aws_dynamodb_table" "messages" {
+  name         = "serverless-chat-messages"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "messageID"
+
+  attribute {
+    name = "messageID"
+    type = "S"
   }
 }
 
@@ -88,6 +77,198 @@ resource "aws_sqs_queue_policy" "allow_sns" {
             "aws:SourceArn" = aws_sns_topic.broadcasts.arn
           }
         }
+      }
+    ]
+  })
+}
+
+// IAM role for on_connect
+resource "aws_iam_role" "on_connect" {
+  name = "serverless_chat_on_connect"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_on_connect_basic_exec" {
+  role       = aws_iam_role.on_connect.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb_write" {
+  name = "lambda-dynamodb-write"
+  role = aws_iam_role.on_connect.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+// IAM role for on_disconnect
+resource "aws_iam_role" "on_disconnect" {
+  name = "serverless_chat_on_disconnect"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_on_disconnect_basic_exec" {
+  role       = aws_iam_role.on_disconnect.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb_delete" {
+  name = "lambda-dynamodb-write"
+  role = aws_iam_role.on_disconnect.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DeleteItem",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+// IAM role for on_default
+resource "aws_iam_role" "on_default" {
+  name = "serverless_chat_on_default"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_on_default_basic_exec" {
+  role       = aws_iam_role.on_default.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+// IAM role for on_message
+resource "aws_iam_role" "on_message" {
+  name = "serverless_chat_on_message"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambda_on_message_basic_exec" {
+  role       = aws_iam_role.on_message.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_sns_publish" {
+  name = "lambda-sns-publish"
+  role = aws_iam_role.on_message.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish",
+          # "sqs:SendMessage",
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+// IAM role for broadcast_message
+resource "aws_iam_role" "broadcast_message" {
+  name = "serverless_chat_broadcast_message"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "lambda_broadcast_message_basic_exec" {
+  role       = aws_iam_role.broadcast_message.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_dynamodb_scan" {
+  name = "lambda-dynamodb-write"
+  role = aws_iam_role.broadcast_message.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan",
+          # "execute-api:Invoke",
+          "execute-api:ManageConnections"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -129,48 +310,66 @@ resource "aws_lambda_function" "on_connect" {
   function_name    = "on_connect"
   filename         = data.archive_file.on_connect_zip.output_path
   source_code_hash = data.archive_file.on_connect_zip.output_base64sha256
-  handler          = "on_connect.lambda_handler"
+  handler          = "on_connect.on_connect"
   runtime          = var.lambda_runtime
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.on_connect.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "on_disconnect" {
   function_name    = "on_disconnect"
   filename         = data.archive_file.on_disconnect_zip.output_path
   source_code_hash = data.archive_file.on_disconnect_zip.output_base64sha256
-  handler          = "on_disconnect.lambda_handler"
+  handler          = "on_disconnect.on_disconnect"
   runtime          = var.lambda_runtime
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.on_disconnect.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "on_default" {
   function_name    = "on_default"
   filename         = data.archive_file.on_default_zip.output_path
   source_code_hash = data.archive_file.on_default_zip.output_base64sha256
-  handler          = "on_default.lambda_handler"
+  handler          = "on_default.on_default"
   runtime          = var.lambda_runtime
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.on_default.arn
 }
 
 resource "aws_lambda_function" "on_message" {
   function_name    = "on_message"
   filename         = data.archive_file.on_message_zip.output_path
   source_code_hash = data.archive_file.on_message_zip.output_base64sha256
-  handler          = "on_message.lambda_handler"
+  handler          = "on_message.on_message"
   runtime          = var.lambda_runtime
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.on_message.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+      "messageTableName"    = aws_dynamodb_table.messages.name
+      "messageTopicARN"     = aws_sns_topic.broadcasts.arn
+    }
+  }
 }
 
 resource "aws_lambda_function" "broadcast_message" {
   function_name    = "broadcast_message"
   filename         = data.archive_file.broadcast_message_zip.output_path
   source_code_hash = data.archive_file.broadcast_message_zip.output_base64sha256
-  handler          = "broadcast_message.lambda_handler"
+  handler          = "broadcast_message.broadcast_message"
   runtime          = var.lambda_runtime
-  role             = aws_iam_role.lambda_exec.arn
+  role             = aws_iam_role.broadcast_message.arn
   environment {
     variables = {
-      SNS_TOPIC_ARN = aws_sns_topic.broadcasts.arn
+      "connectionTableName" = aws_dynamodb_table.connections.name
+      "apigwEndpoint"       = aws_apigatewayv2_stage.dev.invoke_url
     }
   }
 }
@@ -229,7 +428,7 @@ resource "aws_apigatewayv2_route" "default_route" {
 // application route for message actions. Expect clients to send JSON like { "action": "message", ... }
 resource "aws_apigatewayv2_route" "message_route" {
   api_id    = aws_apigatewayv2_api.ws_api.id
-  route_key = "message"
+  route_key = "sendmessage"
   target    = "integrations/${aws_apigatewayv2_integration.message_integration.id}"
 }
 
@@ -282,32 +481,37 @@ resource "aws_lambda_permission" "apigw_invoke_message" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.on_message.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api.id}/*/message"
+  source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api.id}/*/sendmessage"
 }
 
 // Data source to get account ID for permissions
 data "aws_caller_identity" "current" {}
 
-// Give Lambda permission to publish to SNS (for broadcaster)
-resource "aws_iam_role_policy" "lambda_sns_publish" {
-  name = "lambda-sns-publish"
-  role = aws_iam_role.lambda_exec.id
+// Inline Lambda permission to consume SQS
+resource "aws_iam_role_policy" "sqs_lambda_trigger" {
+  name = "sqs-lambda-trigger"
+  role = aws_iam_role.broadcast_message.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+      # Allow Lambda to poll and delete SQS messages
       {
         Effect = "Allow"
         Action = [
-          "sns:Publish",
-          "sqs:SendMessage",
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:UpdateItem",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
         ]
-        Resource = "*"
+        Resource = aws_sqs_queue.broadcast_queue.arn
       }
     ]
   })
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = aws_sqs_queue.broadcast_queue.arn
+  function_name    = aws_lambda_function.broadcast_message.arn
+  batch_size       = 10
+  enabled          = true
 }
