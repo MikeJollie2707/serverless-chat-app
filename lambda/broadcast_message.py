@@ -7,8 +7,7 @@ from botocore.exceptions import ClientError
 def broadcast_message(event, context):
     api_gw = boto3.client(
         'apigatewaymanagementapi', 
-        region_name="us-west-1", # TODO: turn this to env
-        endpoint_url=os.getenv("apigw_https_url"))
+        endpoint_url=os.getenv("apigwEndpoint").replace("wss://", "https://"))
     print(event)
 
     dynamodb = boto3.resource('dynamodb')
