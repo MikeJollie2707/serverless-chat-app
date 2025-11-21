@@ -1,0 +1,4 @@
+# Terraform builds
+terraform/*
+!terraform/*.tf
+!terraform/*.md
