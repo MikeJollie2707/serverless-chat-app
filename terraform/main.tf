@@ -33,6 +33,18 @@ resource "aws_dynamodb_table" "connections" {
   }
 }
 
+// DynamoDB for storing messages
+resource "aws_dynamodb_table" "messages" {
+  name = "serverless-chat-messages"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key = "messageID"
+
+  attribute {
+    name = "messageID"
+    type = "S"
+  }
+}
+
 // SNS topic and SQS queue (used by broadcaster pattern)
 resource "aws_sns_topic" "broadcasts" {
   name = "serverless-chat-broadcasts"
@@ -298,25 +310,35 @@ resource "aws_lambda_function" "on_connect" {
   function_name    = "on_connect"
   filename         = data.archive_file.on_connect_zip.output_path
   source_code_hash = data.archive_file.on_connect_zip.output_base64sha256
-  handler          = "on_connect.lambda_handler"
+  handler          = "on_connect.on_connect"
   runtime          = var.lambda_runtime
   role             = aws_iam_role.on_connect.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "on_disconnect" {
   function_name    = "on_disconnect"
   filename         = data.archive_file.on_disconnect_zip.output_path
   source_code_hash = data.archive_file.on_disconnect_zip.output_base64sha256
-  handler          = "on_disconnect.lambda_handler"
+  handler          = "on_disconnect.on_disconnect"
   runtime          = var.lambda_runtime
   role             = aws_iam_role.on_disconnect.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+    }
+  }
 }
 
 resource "aws_lambda_function" "on_default" {
   function_name    = "on_default"
   filename         = data.archive_file.on_default_zip.output_path
   source_code_hash = data.archive_file.on_default_zip.output_base64sha256
-  handler          = "on_default.lambda_handler"
+  handler          = "on_default.on_default"
   runtime          = var.lambda_runtime
   role             = aws_iam_role.on_default.arn
 }
@@ -325,21 +347,29 @@ resource "aws_lambda_function" "on_message" {
   function_name    = "on_message"
   filename         = data.archive_file.on_message_zip.output_path
   source_code_hash = data.archive_file.on_message_zip.output_base64sha256
-  handler          = "on_message.lambda_handler"
+  handler          = "on_message.on_message"
   runtime          = var.lambda_runtime
   role             = aws_iam_role.on_message.arn
+  environment {
+    variables = {
+      "connectionTableName" = aws_dynamodb_table.connections.name
+      "messageTableName" = aws_dynamodb_table.messages.name
+      "messageTopicARN" = aws_sns_topic.broadcasts.arn
+    }
+  }
 }
 
 resource "aws_lambda_function" "broadcast_message" {
   function_name    = "broadcast_message"
   filename         = data.archive_file.broadcast_message_zip.output_path
   source_code_hash = data.archive_file.broadcast_message_zip.output_base64sha256
-  handler          = "broadcast_message.lambda_handler"
+  handler          = "broadcast_message.broadcast_message"
   runtime          = var.lambda_runtime
   role             = aws_iam_role.broadcast_message.arn
   environment {
     variables = {
-      SNS_TOPIC_ARN = aws_sns_topic.broadcasts.arn
+      "connectionTableName" = aws_dynamodb_table.connections.name
+      "apigwEndpoint" = aws_apigatewayv2_stage.dev.invoke_url
     }
   }
 }
@@ -398,7 +428,7 @@ resource "aws_apigatewayv2_route" "default_route" {
 // application route for message actions. Expect clients to send JSON like { "action": "message", ... }
 resource "aws_apigatewayv2_route" "message_route" {
   api_id    = aws_apigatewayv2_api.ws_api.id
-  route_key = "message"
+  route_key = "sendmessage"
   target    = "integrations/${aws_apigatewayv2_integration.message_integration.id}"
 }
 
@@ -451,7 +481,7 @@ resource "aws_lambda_permission" "apigw_invoke_message" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.on_message.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api.id}/*/message"
+  source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api.id}/*/sendmessage"
 }
 
 // Data source to get account ID for permissions
