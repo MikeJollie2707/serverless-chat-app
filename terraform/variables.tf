@@ -1,7 +1,13 @@
-variable "region" {
+variable "region1" {
   description = "AWS region to deploy resources into"
   type        = string
-  default     = "us-west-1"
+  default     = "us-west-2"
+}
+
+variable "region2" {
+  description = "AWS region to deploy resources into"
+  type        = string
+  default     = "us-east-2"
 }
 
 variable "lambda_runtime" {
