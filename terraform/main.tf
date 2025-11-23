@@ -33,7 +33,7 @@ resource "aws_dynamodb_table" "connections" {
     type = "S"
   }
 
-  stream_enabled = true
+  stream_enabled   = true
   stream_view_type = "NEW_IMAGE"
 
   replica {
@@ -56,7 +56,7 @@ resource "aws_dynamodb_table" "messages" {
     type = "S"
   }
 
-  stream_enabled = true
+  stream_enabled   = true
   stream_view_type = "NEW_IMAGE"
 
   replica {
@@ -424,7 +424,7 @@ data "archive_file" "broadcast_message_zip" {
 }
 
 data "archive_file" "cognito_trigger_signup_zip" {
-  type = "zip"
+  type        = "zip"
   source_file = "${path.module}/../lambda/cognito_trigger_signup.py"
   output_path = "${path.module}/build/cognito_trigger_signup.zip"
 }
@@ -572,45 +572,45 @@ resource "aws_lambda_function" "broadcast_message2" {
 }
 
 resource "aws_lambda_function" "authorizer1" {
-  function_name = "authorizer1"
-  filename = "${path.module}/../lambda/authorizer/package.zip"
+  function_name    = "authorizer1"
+  filename         = "${path.module}/../lambda/authorizer/package.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda/authorizer/package.zip")
-  handler = "authorizer.authorizer"
-  runtime = var.lambda_runtime
-  role = aws_iam_role.authorizer.arn
+  handler          = "authorizer.authorizer"
+  runtime          = var.lambda_runtime
+  role             = aws_iam_role.authorizer.arn
 
   environment {
     variables = {
       "APP_CLIENT_ID" = ""
-      "COGNITO_URL" = ""
+      "COGNITO_URL"   = ""
     }
   }
 }
 
 resource "aws_lambda_function" "authorizer2" {
-  provider = aws.secondary
-  function_name = "authorizer2"
-  filename = "${path.module}/../lambda/authorizer/package.zip"
+  provider         = aws.secondary
+  function_name    = "authorizer2"
+  filename         = "${path.module}/../lambda/authorizer/package.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda/authorizer/package.zip")
-  handler = "authorizer.authorizer"
-  runtime = var.lambda_runtime
-  role = aws_iam_role.authorizer.arn
+  handler          = "authorizer.authorizer"
+  runtime          = var.lambda_runtime
+  role             = aws_iam_role.authorizer.arn
 
   environment {
     variables = {
       "APP_CLIENT_ID" = ""
-      "COGNITO_URL" = ""
+      "COGNITO_URL"   = ""
     }
   }
 }
 
 resource "aws_lambda_function" "cognito_verify" {
-  function_name = "cognito_verify"
-  filename = data.archive_file.cognito_trigger_signup_zip.output_path
+  function_name    = "cognito_verify"
+  filename         = data.archive_file.cognito_trigger_signup_zip.output_path
   source_code_hash = data.archive_file.cognito_trigger_signup_zip.output_base64sha256
-  handler = "cognito_trigger_signup.lambda_handler"
-  runtime = var.lambda_runtime
-  role = aws_iam_role.cognito_verify.arn
+  handler          = "cognito_trigger_signup.lambda_handler"
+  runtime          = var.lambda_runtime
+  role             = aws_iam_role.cognito_verify.arn
 }
 
 // WebSocket API
@@ -647,11 +647,11 @@ resource "aws_apigatewayv2_integration" "message_integration1" {
 
 // Routes
 resource "aws_apigatewayv2_route" "connect_route1" {
-  api_id    = aws_apigatewayv2_api.ws_api1.id
-  route_key = "$connect"
-  target    = "integrations/${aws_apigatewayv2_integration.connect_integration1.id}"
+  api_id             = aws_apigatewayv2_api.ws_api1.id
+  route_key          = "$connect"
+  target             = "integrations/${aws_apigatewayv2_integration.connect_integration1.id}"
   authorization_type = "CUSTOM"
-  authorizer_id = aws_apigatewayv2_authorizer.apigw_authorizer1.id
+  authorizer_id      = aws_apigatewayv2_authorizer.apigw_authorizer1.id
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route1" {
@@ -734,10 +734,10 @@ resource "aws_lambda_permission" "apigw_invoke_authorizer1" {
 }
 
 resource "aws_apigatewayv2_authorizer" "apigw_authorizer1" {
-  api_id = aws_apigatewayv2_api.ws_api1.id
-  name = "sjsu-authorizer"
-  authorizer_type = "REQUEST"
-  authorizer_uri = aws_lambda_function.authorizer1.invoke_arn
+  api_id           = aws_apigatewayv2_api.ws_api1.id
+  name             = "sjsu-authorizer"
+  authorizer_type  = "REQUEST"
+  authorizer_uri   = aws_lambda_function.authorizer1.invoke_arn
   identity_sources = ["route.request.querystring.token"]
 }
 
@@ -780,12 +780,12 @@ resource "aws_apigatewayv2_integration" "message_integration2" {
 
 // Routes
 resource "aws_apigatewayv2_route" "connect_route2" {
-  provider  = aws.secondary
-  api_id    = aws_apigatewayv2_api.ws_api2.id
-  route_key = "$connect"
-  target    = "integrations/${aws_apigatewayv2_integration.connect_integration2.id}"
+  provider           = aws.secondary
+  api_id             = aws_apigatewayv2_api.ws_api2.id
+  route_key          = "$connect"
+  target             = "integrations/${aws_apigatewayv2_integration.connect_integration2.id}"
   authorization_type = "CUSTOM"
-  authorizer_id = aws_apigatewayv2_authorizer.apigw_authorizer2.id
+  authorizer_id      = aws_apigatewayv2_authorizer.apigw_authorizer2.id
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route2" {
@@ -869,7 +869,7 @@ resource "aws_lambda_permission" "apigw_invoke_message2" {
 }
 
 resource "aws_lambda_permission" "apigw_invoke_authorizer2" {
-  provider = aws.secondary
+  provider      = aws.secondary
   statement_id  = "AllowExecutionFromAPIGWMessage"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.authorizer2.function_name
@@ -878,11 +878,11 @@ resource "aws_lambda_permission" "apigw_invoke_authorizer2" {
 }
 
 resource "aws_apigatewayv2_authorizer" "apigw_authorizer2" {
-  provider = aws.secondary
-  api_id = aws_apigatewayv2_api.ws_api2.id
-  name = "sjsu-authorizer"
-  authorizer_type = "REQUEST"
-  authorizer_uri = aws_lambda_function.authorizer2.invoke_arn
+  provider         = aws.secondary
+  api_id           = aws_apigatewayv2_api.ws_api2.id
+  name             = "sjsu-authorizer"
+  authorizer_type  = "REQUEST"
+  authorizer_uri   = aws_lambda_function.authorizer2.invoke_arn
   identity_sources = ["route.request.querystring.token"]
 }
 
