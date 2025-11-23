@@ -346,6 +346,52 @@ resource "aws_iam_role_policy" "lambda_dynamodb_scan" {
   })
 }
 
+// IAM role for authorizer
+resource "aws_iam_role" "authorizer" {
+  name = "serverless_chat_authorizer"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_authorizer_basic_exec" {
+  role       = aws_iam_role.authorizer.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+// IAM role for cognito verify
+resource "aws_iam_role" "cognito_verify" {
+  name = "serverless_chat_cognito_verify"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_cognito_verify_basic_exec" {
+  role       = aws_iam_role.cognito_verify.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
 // Package each lambda file into a separate zip using archive provider. Assumes files are in ../lambda/*.py
 data "archive_file" "on_connect_zip" {
   type        = "zip"
@@ -375,6 +421,12 @@ data "archive_file" "broadcast_message_zip" {
   type        = "zip"
   source_file = "${path.module}/../lambda/broadcast_message.py"
   output_path = "${path.module}/build/broadcast_message.zip"
+}
+
+data "archive_file" "cognito_trigger_signup_zip" {
+  type = "zip"
+  source_file = "${path.module}/../lambda/cognito_trigger_signup.py"
+  output_path = "${path.module}/build/cognito_trigger_signup.zip"
 }
 
 // Lambda functions
@@ -519,6 +571,48 @@ resource "aws_lambda_function" "broadcast_message2" {
   }
 }
 
+resource "aws_lambda_function" "authorizer1" {
+  function_name = "authorizer1"
+  filename = "${path.module}/../lambda/authorizer/package.zip"
+  source_code_hash = filebase64sha256("${path.module}/../lambda/authorizer/package.zip")
+  handler = "authorizer.authorizer"
+  runtime = var.lambda_runtime
+  role = aws_iam_role.authorizer.arn
+
+  environment {
+    variables = {
+      "APP_CLIENT_ID" = ""
+      "COGNITO_URL" = ""
+    }
+  }
+}
+
+resource "aws_lambda_function" "authorizer2" {
+  provider = aws.secondary
+  function_name = "authorizer2"
+  filename = "${path.module}/../lambda/authorizer/package.zip"
+  source_code_hash = filebase64sha256("${path.module}/../lambda/authorizer/package.zip")
+  handler = "authorizer.authorizer"
+  runtime = var.lambda_runtime
+  role = aws_iam_role.authorizer.arn
+
+  environment {
+    variables = {
+      "APP_CLIENT_ID" = ""
+      "COGNITO_URL" = ""
+    }
+  }
+}
+
+resource "aws_lambda_function" "cognito_verify" {
+  function_name = "cognito_verify"
+  filename = data.archive_file.cognito_trigger_signup_zip.output_path
+  source_code_hash = data.archive_file.cognito_trigger_signup_zip.output_base64sha256
+  handler = "cognito_trigger_signup.lambda_handler"
+  runtime = var.lambda_runtime
+  role = aws_iam_role.cognito_verify.arn
+}
+
 // WebSocket API
 resource "aws_apigatewayv2_api" "ws_api1" {
   name                       = "serverless-chat-ws1"
@@ -556,6 +650,8 @@ resource "aws_apigatewayv2_route" "connect_route1" {
   api_id    = aws_apigatewayv2_api.ws_api1.id
   route_key = "$connect"
   target    = "integrations/${aws_apigatewayv2_integration.connect_integration1.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id = aws_apigatewayv2_authorizer.apigw_authorizer1.id
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route1" {
@@ -626,7 +722,23 @@ resource "aws_lambda_permission" "apigw_invoke_message1" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.on_message1.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${var.region1}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api1.id}/*/sendmessage"
+  source_arn    = "${aws_apigatewayv2_api.ws_api1.execution_arn}/*/sendmessage"
+}
+
+resource "aws_lambda_permission" "apigw_invoke_authorizer1" {
+  statement_id  = "AllowExecutionFromAPIGWMessage"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.authorizer1.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.ws_api1.execution_arn}/authorizers/${aws_apigatewayv2_authorizer.apigw_authorizer1.id}"
+}
+
+resource "aws_apigatewayv2_authorizer" "apigw_authorizer1" {
+  api_id = aws_apigatewayv2_api.ws_api1.id
+  name = "sjsu-authorizer"
+  authorizer_type = "REQUEST"
+  authorizer_uri = aws_lambda_function.authorizer1.invoke_arn
+  identity_sources = ["route.request.querystring.token"]
 }
 
 // Second region
@@ -672,6 +784,8 @@ resource "aws_apigatewayv2_route" "connect_route2" {
   api_id    = aws_apigatewayv2_api.ws_api2.id
   route_key = "$connect"
   target    = "integrations/${aws_apigatewayv2_integration.connect_integration2.id}"
+  authorization_type = "CUSTOM"
+  authorizer_id = aws_apigatewayv2_authorizer.apigw_authorizer2.id
 }
 
 resource "aws_apigatewayv2_route" "disconnect_route2" {
@@ -752,6 +866,24 @@ resource "aws_lambda_permission" "apigw_invoke_message2" {
   function_name = aws_lambda_function.on_message2.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:${var.region2}:${data.aws_caller_identity.current.account_id}:${aws_apigatewayv2_api.ws_api2.id}/*/sendmessage"
+}
+
+resource "aws_lambda_permission" "apigw_invoke_authorizer2" {
+  provider = aws.secondary
+  statement_id  = "AllowExecutionFromAPIGWMessage"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.authorizer2.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.ws_api2.execution_arn}/authorizers/*"
+}
+
+resource "aws_apigatewayv2_authorizer" "apigw_authorizer2" {
+  provider = aws.secondary
+  api_id = aws_apigatewayv2_api.ws_api2.id
+  name = "sjsu-authorizer"
+  authorizer_type = "REQUEST"
+  authorizer_uri = aws_lambda_function.authorizer2.invoke_arn
+  identity_sources = ["route.request.querystring.token"]
 }
 
 // Data source to get account ID for permissions

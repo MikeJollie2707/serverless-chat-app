@@ -1,6 +1,6 @@
 # Terraform
 
-These Terraform files will create the setup as shown in the architecture.
+These Terraform files will create the setup as shown in the architecture. It will not bring up AWS Cognito and things related to it (like environment variables that are related to user pool/app client).
 
 ## Prerequisites
 
@@ -8,6 +8,8 @@ These Terraform files will create the setup as shown in the architecture.
 - [terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
 ## Setup
+
+Before continuing, please follow [this](../lambda/authorizer/README.md) to build a specific Lambda before running Terraform.
 
 Change working directory to `terraform/`. Use `terraform init` only for the first time.
 
