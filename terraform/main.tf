@@ -34,6 +34,7 @@ resource "aws_dynamodb_table" "connections" {
   }
 
   stream_enabled = true
+  stream_view_type = "NEW_IMAGE"
 
   replica {
     region_name = var.region2
@@ -56,6 +57,7 @@ resource "aws_dynamodb_table" "messages" {
   }
 
   stream_enabled = true
+  stream_view_type = "NEW_IMAGE"
 
   replica {
     region_name = var.region2
