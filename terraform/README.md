@@ -4,7 +4,7 @@ These Terraform files will create the setup as shown in the architecture. It wil
 
 ## Prerequisites
 
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) with credential configured.
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) with credential configured
 - [terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
 ## Setup
@@ -39,3 +39,9 @@ terraform destroy
 ```
 
 Most editing happens in `main.tf` and rarely `variables.tf`. `outputs.tf` shows the output after applying the changes.
+
+To review the changes when it is too long for the terminal to display all:
+
+```sh
+terraform plan -no-color > plan.txt
+```
