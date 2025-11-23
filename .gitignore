@@ -2,3 +2,7 @@
 terraform/*
 !terraform/*.tf
 !terraform/*.md
+
+# Python dependencies
+lambda/*/deps/*
+lambda/*/*.zip
